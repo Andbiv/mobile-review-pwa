@@ -60,6 +60,8 @@ export async function renderReview(container, package_id) {
     <header class="app-header">
       <div class="title" id="hud-title">…</div>
       <div class="actions">
+        <button class="subtle nav-btn" id="prev-btn" aria-label="Previous">◀</button>
+        <button class="subtle nav-btn" id="next-btn" aria-label="Next">▶</button>
         <button class="subtle" id="undo-btn" disabled>Undo</button>
         <button class="subtle" onclick="location.hash='#library'">Done</button>
       </div>
@@ -75,7 +77,7 @@ export async function renderReview(container, package_id) {
         <button id="tg-chm" class="on">CHM</button>
         <button id="tg-rgb">RGB</button>
       </div>
-      <div class="verdict-row">
+      <div class="verdict-row" id="verdict-row">
         <button class="fp" id="btn-fp">FP</button>
         <button class="skip" id="btn-skip">SKIP</button>
         <button class="tp" id="btn-tp">TP</button>
@@ -89,6 +91,8 @@ export async function renderReview(container, package_id) {
   document.getElementById('tg-chm').addEventListener('click', () => { state.chmFirst = true; refresh(state); });
   document.getElementById('tg-rgb').addEventListener('click', () => { state.chmFirst = false; refresh(state); });
   document.getElementById('undo-btn').addEventListener('click', () => undo(state));
+  document.getElementById('prev-btn').addEventListener('click', () => goPrev(state));
+  document.getElementById('next-btn').addEventListener('click', () => goNext(state));
 
   bindKeyboard(state);
   bindSwipe(document.getElementById('card-area'), state);
@@ -100,43 +104,79 @@ async function refresh(state) {
   const { pack, cursor, verdicts } = state;
   const total = pack.detections.length;
 
-  // Progress
+  // Progress + HUD
   const reviewed = verdicts.size;
   document.getElementById('progress-bar').style.width =
     `${Math.min(100, Math.round(reviewed / Math.max(1, total) * 100))}%`;
-  document.getElementById('hud-title').textContent =
-    `${reviewed}/${total} reviewed`;
   document.getElementById('undo-btn').disabled = !state.lastApplied;
 
-  // End state
+  // Nav button state — Prev disabled at start, Next disabled at the
+  // sentinel "end" position. End-state can be reached either by reviewing
+  // through, or via Next from the last card; from end-state the user can
+  // Prev back to audit.
+  document.getElementById('prev-btn').disabled = cursor <= 0;
+  document.getElementById('next-btn').disabled = cursor >= total;
+
+  // End state — keep nav usable so the user can Prev back to audit.
   if (cursor >= total) {
-    document.querySelector('.card-area').innerHTML =
-      `<div class="done-state">
-         <div class="big">🎉 Pack complete</div>
-         <div>${reviewed} of ${total} reviewed.</div>
-         <div class="btn-row" style="justify-content:center">
-           <button class="primary" onclick="location.hash='#library'">Back to library</button>
-         </div>
-       </div>`;
+    document.getElementById('hud-title').textContent =
+      `${reviewed}/${total} reviewed`;
+    document.getElementById('hud-badges').innerHTML =
+      '<span class="badge">end of pack</span>';
+    // Replace the card-area contents but keep the element so prev/next still work.
+    const cardArea = document.getElementById('card-area');
+    cardArea.innerHTML = `
+      <div class="done-state">
+        <div class="big">🎉 Pack complete</div>
+        <div>${reviewed} of ${total} reviewed.</div>
+        <div class="btn-row" style="justify-content:center; gap:0.6em">
+          <button class="subtle" id="audit-from-start">Review from start</button>
+          <button class="primary" onclick="location.hash='#library'">Back to library</button>
+        </div>
+      </div>`;
+    document.getElementById('audit-from-start')?.addEventListener('click', () => {
+      state.cursor = 0;
+      refresh(state);
+    });
     document.getElementById('toggle-row').style.display = 'none';
-    document.querySelector('.verdict-row').style.display = 'none';
+    document.getElementById('verdict-row').style.display = 'none';
     return;
   }
 
-  const det = pack.detections[cursor];
+  // Ensure the card UI is back if we navigated away from end-state.
+  document.getElementById('toggle-row').style.display = '';
+  document.getElementById('verdict-row').style.display = '';
+  const cardArea = document.getElementById('card-area');
+  if (!cardArea.querySelector('img.card-img')) {
+    cardArea.innerHTML = `
+      <div class="swipe-hint">⇽ FP &nbsp;·&nbsp; SKIP ⤴ &nbsp;·&nbsp; TP ⇾</div>
+      <img class="card-img" id="card-img" alt="">`;
+  }
 
-  // Badges
+  const det = pack.detections[cursor];
+  const existing = verdicts.get(det.det_id);
+
+  // Title: cursor position
+  document.getElementById('hud-title').textContent =
+    `card ${cursor + 1}/${total} · ${reviewed} reviewed`;
+
+  // Badges — show class/conf/area + a strong "Current: X" chip when the
+  // card already has a verdict, so the user can audit at a glance.
   const cls = det.cls || '?';
   const conf = det.conf !== undefined ? det.conf.toFixed(2) : '?';
   const area = det.area_m2 !== undefined ? `${det.area_m2.toFixed(1)} m²` : '?';
   const prior = det.prior_decision;
   const priorChip = prior
     ? `<span class="badge prior${prior}">prior: ${prior}</span>` : '';
+  const currentChip = existing
+    ? `<span class="badge current-${existing.decision}">current: ${existing.decision}</span>`
+    : '';
   document.getElementById('hud-badges').innerHTML = `
     <span class="badge">${escapeHtml(cls)}</span>
     <span class="badge">conf ${conf}</span>
     <span class="badge">${area}</span>
     ${priorChip}
+    ${currentChip}
   `;
 
   // Image
@@ -155,6 +195,32 @@ async function refresh(state) {
   // Toggle highlights
   document.getElementById('tg-chm').classList.toggle('on', state.chmFirst);
   document.getElementById('tg-rgb').classList.toggle('on', !state.chmFirst);
+
+  // Highlight the verdict button that matches the current decision so the
+  // user sees what they decided last time without reading the badge.
+  for (const id of ['btn-tp', 'btn-fp', 'btn-skip']) {
+    document.getElementById(id).classList.remove('active');
+  }
+  if (existing) {
+    const map = { TP: 'btn-tp', FP: 'btn-fp', SKIP: 'btn-skip' };
+    document.getElementById(map[existing.decision])?.classList.add('active');
+  }
+}
+
+async function goPrev(state) {
+  if (state.cursor > 0) {
+    state.cursor--;
+    state.lastApplied = null;   // navigation clears the undo target
+    await refresh(state);
+  }
+}
+
+async function goNext(state) {
+  if (state.cursor < state.pack.detections.length) {
+    state.cursor++;
+    state.lastApplied = null;
+    await refresh(state);
+  }
 }
 
 async function applyVerdict(state, decision) {
@@ -202,6 +268,8 @@ function bindKeyboard(state) {
     else if (k === 's' || k === '3') { ev.preventDefault(); applyVerdict(state, 'SKIP'); }
     else if (k === 'u') { ev.preventDefault(); undo(state); }
     else if (k === 'c') { ev.preventDefault(); state.chmFirst = !state.chmFirst; refresh(state); }
+    else if (k === 'arrowleft' || k === '[') { ev.preventDefault(); goPrev(state); }
+    else if (k === 'arrowright' || k === ']') { ev.preventDefault(); goNext(state); }
   });
 }
 

@@ -47,8 +47,11 @@ main#app { display: block; min-height: 100vh; }
   border-bottom: 1px solid var(--border);
   position: sticky; top: 0; z-index: 10;
 }
-.app-header .title { font-weight: 700; font-size: 1.1em; }
-.app-header .actions { display: flex; gap: 0.4em; }
+.app-header .title { font-weight: 700; font-size: 1.05em; }
+.app-header .actions { display: flex; gap: 0.4em; align-items: center; }
+.app-header .nav-btn {
+  padding: 0.4em 0.7em; font-size: 1.1em; min-height: 40px; min-width: 40px;
+}
 
 /* ---------------------------------------------------------------- buttons */
 button {
@@ -162,6 +165,17 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 .review .verdict-row button.tp { background: var(--tp); color: #fff; border-color: var(--tp); }
 .review .verdict-row button.fp { background: var(--fp); color: #fff; border-color: var(--fp); }
 .review .verdict-row button.skip { background: var(--skip); color: #fff; border-color: var(--skip); }
+.review .verdict-row button.active {
+  /* Inset white outline shows which decision is currently applied to the card */
+  box-shadow: inset 0 0 0 3px #fff;
+}
+
+/* "Current: TP" / "Current: FP" / "Current: SKIP" chip in the HUD when
+   reviewing a card that already has a decision. Same hues as the buttons
+   so the visual link is obvious. */
+.review .badge.current-TP   { background: var(--tp);   color: #fff; }
+.review .badge.current-FP   { background: var(--fp);   color: #fff; }
+.review .badge.current-SKIP { background: var(--skip); color: #fff; }
 
 .review .progress-bar {
   height: 0.3em; background: var(--surface);
