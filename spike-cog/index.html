@@ -60,7 +60,10 @@
   <p>Pick the test COG you placed in your OneDrive folder. PWA streams it
      into OPFS in 8 MB chunks. After this succeeds, the file is persisted
      and you can reload the page — Test 3 will read it back.</p>
-  <input type="file" id="cog-input" accept=".tif,.tiff,image/tiff" style="display:none">
+  <!-- No accept filter — iOS Files often hides .tif because it's not
+       classified as image/tiff. We validate the file inside the import
+       logic anyway, so any pickable file is fine here. -->
+  <input type="file" id="cog-input" style="display:none">
   <button onclick="document.getElementById('cog-input').click()">Pick a COG to copy into OPFS</button>
   <progress id="copy-progress" max="1" value="0" style="display:none"></progress>
   <div class="result" id="r-copy">Waiting…</div>

@@ -129,7 +129,8 @@ async function pickAndLoadCog() {
   const { streamCogIntoOpfs } = await import('../ortho.js');
   const inp = document.createElement('input');
   inp.type = 'file';
-  inp.accept = '.tif,.tiff,image/tiff';
+  // No accept filter — iOS Files hides .tif when it isn't classified as
+  // image/tiff (which it often isn't for OneDrive-synced GeoTIFFs).
   inp.style.display = 'none';
   inp.addEventListener('change', async () => {
     const file = inp.files[0];
