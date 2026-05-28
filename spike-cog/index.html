@@ -90,7 +90,9 @@
   <div class="result" id="r-clear">Use when you want to wipe the spike's OPFS data.</div>
 </div>
 
-<!-- OpenLayers UMD build for direct browser use -->
+<!-- geotiff.js must load BEFORE ol.js — the OL UMD bundle externalizes the
+     geotiff dep and looks for it as a global at module-init time. -->
+<script src="https://cdn.jsdelivr.net/npm/geotiff@2.1.3/dist-browser/geotiff.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/ol@10.5.0/dist/ol.js"></script>
 <script>
 // ---------- env detection ----------
@@ -105,6 +107,9 @@ function envCheck() {
   chips.push(navigator.storage && navigator.storage.getDirectory
     ? '<span class="chip ok">OPFS available</span>'
     : '<span class="chip bad">OPFS missing</span>');
+  chips.push(typeof GeoTIFF !== 'undefined'
+    ? '<span class="chip ok">geotiff.js</span>'
+    : '<span class="chip bad">geotiff.js missing</span>');
   chips.push(typeof ol !== 'undefined' && ol.source && ol.source.GeoTIFF
     ? '<span class="chip ok">OpenLayers GeoTIFF</span>'
     : '<span class="chip bad">OL not loaded</span>');
