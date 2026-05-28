@@ -1,0 +1,11 @@
+{
+  "name": "Juniper Review",
+  "short_name": "JuniperReview",
+  "description": "Review juniper detections from BrushDrone on iPad/iPhone, fully offline.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#1e1e1e",
+  "theme_color": "#1e1e1e"
+}

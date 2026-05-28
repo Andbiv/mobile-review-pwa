@@ -1,0 +1,67 @@
+// Service worker for Juniper Review PWA.
+//
+// Strategy: cache-first for the app shell (so the PWA opens offline);
+// network-first for navigation requests (so updates land when online);
+// passthrough for cross-origin (JSZip CDN handled by browser cache + IDB).
+//
+// Pack zips and verdict JSONs are NEVER cached here — they live in IndexedDB,
+// not Cache Storage. The SW only handles the static shell.
+
+const SHELL_CACHE = 'juniper-review-shell-v1';
+const SHELL = [
+  './',
+  './index.html',
+  './app.css',
+  './manifest.webmanifest',
+  './js/main.js',
+  './js/state.js',
+  './js/pack-import.js',
+  './js/verdict-export.js',
+  './js/views/library.js',
+  './js/views/review.js',
+];
+
+self.addEventListener('install', e => {
+  e.waitUntil(
+    caches.open(SHELL_CACHE)
+      .then(c => c.addAll(SHELL))
+      .then(() => self.skipWaiting())
+  );
+});
+
+self.addEventListener('activate', e => {
+  e.waitUntil(
+    caches.keys()
+      .then(keys => Promise.all(
+        keys.filter(k => k !== SHELL_CACHE).map(k => caches.delete(k))
+      ))
+      .then(() => self.clients.claim())
+  );
+});
+
+self.addEventListener('fetch', e => {
+  const req = e.request;
+  if (req.method !== 'GET') return;
+  const url = new URL(req.url);
+
+  // Cross-origin (JSZip CDN): let the browser handle it.
+  if (url.origin !== self.location.origin) return;
+
+  // For HTML navigations, prefer fresh, fall back to cache.
+  if (req.mode === 'navigate') {
+    e.respondWith(
+      fetch(req).catch(() => caches.match('./index.html'))
+    );
+    return;
+  }
+
+  // For everything else in scope, cache-first with network fill.
+  e.respondWith(
+    caches.match(req).then(hit => hit || fetch(req).then(resp => {
+      // Opportunistic update — don't crash if cache.put fails.
+      const copy = resp.clone();
+      caches.open(SHELL_CACHE).then(c => c.put(req, copy)).catch(() => {});
+      return resp;
+    }))
+  );
+});

@@ -1,0 +1,204 @@
+/* Juniper Review PWA — dark UI optimized for one-handed iPad use. */
+
+:root {
+  --bg: #1e1e1e;
+  --surface: #2b2b2b;
+  --surface-hi: #3a3a3a;
+  --text: #f0f0f0;
+  --text-muted: #a0a0a0;
+  --accent: #ffd54f;        /* same yellow as the polygon outline */
+  --tp: #4caf50;            /* approve / TP */
+  --fp: #e53935;            /* reject / FP */
+  --skip: #757575;          /* skip */
+  --border: #404040;
+  --safe-top: env(safe-area-inset-top);
+  --safe-bottom: env(safe-area-inset-bottom);
+  --safe-left: env(safe-area-inset-left);
+  --safe-right: env(safe-area-inset-right);
+}
+
+* { box-sizing: border-box; }
+html, body {
+  margin: 0; padding: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 16px/1.45 -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-user-select: none; user-select: none;
+  overscroll-behavior: none;
+  touch-action: manipulation;
+}
+body {
+  min-height: 100vh;
+  padding-top: var(--safe-top);
+  padding-bottom: var(--safe-bottom);
+  padding-left: var(--safe-left);
+  padding-right: var(--safe-right);
+}
+
+main#app { display: block; min-height: 100vh; }
+.loading { padding: 4em 1em; text-align: center; color: var(--text-muted); }
+
+/* ---------------------------------------------------------------- header */
+.app-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0.6em 1em;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  position: sticky; top: 0; z-index: 10;
+}
+.app-header .title { font-weight: 700; font-size: 1.1em; }
+.app-header .actions { display: flex; gap: 0.4em; }
+
+/* ---------------------------------------------------------------- buttons */
+button {
+  appearance: none;
+  background: var(--surface-hi);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 0.5em;
+  padding: 0.7em 1em;
+  font-size: 1em;
+  font-weight: 600;
+  cursor: pointer;
+  min-height: 48px;
+}
+button.primary { background: var(--accent); color: #222; border-color: var(--accent); }
+button.subtle  { background: transparent; border-color: var(--border); color: var(--text-muted); }
+button.danger  { background: var(--fp); color: #fff; border-color: var(--fp); }
+button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.btn-row { display: flex; gap: 0.6em; padding: 0.8em 1em; }
+.btn-row button { flex: 1; }
+
+/* ---------------------------------------------------------------- library */
+.library { padding: 0.8em 1em; }
+.empty {
+  padding: 3em 1em; text-align: center; color: var(--text-muted);
+}
+.empty .big { font-size: 1.1em; margin-bottom: 0.6em; color: var(--text); }
+.pack-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 0.8em;
+  padding: 1em;
+  margin-bottom: 0.8em;
+}
+.pack-card .head {
+  display: flex; justify-content: space-between; align-items: baseline; gap: 0.6em;
+}
+.pack-card .name { font-weight: 600; font-size: 1.05em; }
+.pack-card .meta { color: var(--text-muted); font-size: 0.85em; }
+.pack-card .progress {
+  margin: 0.6em 0;
+  background: var(--surface-hi);
+  border-radius: 0.4em;
+  height: 0.5em;
+  overflow: hidden;
+}
+.pack-card .progress > .bar { background: var(--accent); height: 100%; width: 0%; transition: width .2s; }
+.pack-card .actions { display: flex; gap: 0.5em; margin-top: 0.6em; flex-wrap: wrap; }
+.pack-card .actions button { flex: 1; min-width: 90px; }
+.pack-card .status-chip {
+  display: inline-block; padding: 0.15em 0.5em; border-radius: 0.4em;
+  font-size: 0.75em; background: var(--surface-hi); color: var(--text-muted);
+}
+.pack-card .status-chip.exported { background: var(--tp); color: #fff; }
+
+/* ---------------------------------------------------------------- review */
+.review {
+  display: flex; flex-direction: column;
+  min-height: 100vh;
+}
+.review .hud {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 0.6em 1em; background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+.review .hud .badges { display: flex; gap: 0.4em; flex-wrap: wrap; }
+.review .badge {
+  background: var(--surface-hi); color: var(--text);
+  padding: 0.18em 0.5em; border-radius: 0.35em;
+  font-size: 0.82em; font-weight: 600;
+}
+.review .badge.priorTP { background: var(--tp); color: #fff; }
+.review .badge.priorFP { background: var(--fp); color: #fff; }
+
+.review .card-area {
+  flex: 1; display: flex; align-items: center; justify-content: center;
+  padding: 0.4em; background: #111;
+  position: relative; touch-action: pan-y;
+}
+.review .card-img {
+  max-width: 100%; max-height: 100%;
+  object-fit: contain; border-radius: 0.6em;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+}
+.review .swipe-hint {
+  position: absolute; top: 1em; left: 0; right: 0;
+  text-align: center; color: var(--text-muted); font-size: 0.85em;
+  pointer-events: none;
+}
+
+.review .toggle-row {
+  display: flex; gap: 0.4em; padding: 0.4em 1em; justify-content: center;
+}
+.review .toggle-row button {
+  padding: 0.4em 0.8em; font-size: 0.85em; min-height: 36px;
+  background: var(--surface-hi); border-color: var(--border);
+}
+.review .toggle-row button.on { background: var(--accent); color: #222; border-color: var(--accent); }
+
+.review .verdict-row {
+  display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.6em;
+  padding: 0.8em 1em calc(0.8em + var(--safe-bottom));
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+}
+.review .verdict-row button {
+  padding: 1.2em 0.6em; font-size: 1.1em; font-weight: 700;
+  min-height: 64px;
+}
+.review .verdict-row button.tp { background: var(--tp); color: #fff; border-color: var(--tp); }
+.review .verdict-row button.fp { background: var(--fp); color: #fff; border-color: var(--fp); }
+.review .verdict-row button.skip { background: var(--skip); color: #fff; border-color: var(--skip); }
+
+.review .progress-bar {
+  height: 0.3em; background: var(--surface);
+}
+.review .progress-bar > .bar {
+  background: var(--accent); height: 100%; width: 0%; transition: width .2s;
+}
+
+.review .done-state {
+  padding: 4em 1em; text-align: center;
+}
+.review .done-state .big { font-size: 1.3em; margin-bottom: 1em; }
+
+/* ---------------------------------------------------------------- modal */
+.modal-backdrop {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.6);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 100; padding: 1em;
+}
+.modal {
+  background: var(--surface);
+  border-radius: 0.8em;
+  padding: 1.2em;
+  max-width: 32em; width: 100%;
+}
+.modal h2 { margin: 0 0 0.6em; font-size: 1.1em; }
+.modal .row { display: flex; gap: 0.6em; margin-top: 1em; }
+.modal .row button { flex: 1; }
+
+/* ---------------------------------------------------------------- toast */
+.toast {
+  position: fixed; bottom: calc(1em + var(--safe-bottom));
+  left: 50%; transform: translateX(-50%);
+  background: var(--surface-hi); color: var(--text);
+  padding: 0.7em 1.2em; border-radius: 0.5em;
+  border: 1px solid var(--border); z-index: 200;
+  font-size: 0.9em;
+}
+.toast.ok { border-color: var(--tp); }
+.toast.err { border-color: var(--fp); }
