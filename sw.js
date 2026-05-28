@@ -7,7 +7,10 @@
 // Pack zips and verdict JSONs are NEVER cached here — they live in IndexedDB,
 // not Cache Storage. The SW only handles the static shell.
 
-const SHELL_CACHE = 'juniper-review-shell-v1';
+// Bump the version string on every UI change so the SW evicts the old cache
+// on activate and forces fresh fetches of HTML/JS/CSS. iOS Safari is sticky
+// about cached shells otherwise.
+const SHELL_CACHE = 'juniper-review-shell-v2';
 const SHELL = [
   './',
   './index.html',
