@@ -62,6 +62,13 @@ main#app { display: block; min-height: 100vh; }
   white-space: nowrap;
   align-self: center;
 }
+.refresh-btn {
+  /* Tight icon-only button next to the version chip — force a SW update
+     when the iPad is stuck on an old build. */
+  padding: 0.4em 0.6em; font-size: 1em; min-height: 36px; min-width: 36px;
+  background: var(--surface-hi); border-color: var(--border);
+  line-height: 1;
+}
 
 /* ---------------------------------------------------------------- buttons */
 button {

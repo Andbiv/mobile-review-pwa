@@ -11,7 +11,7 @@
 // on activate and forces fresh fetches of HTML/JS/CSS. iOS Safari is sticky
 // about cached shells otherwise. (And the BUILD constant in js/build.js
 // shows the version in the PWA header so you can verify which is live.)
-const SHELL_CACHE = 'juniper-review-shell-v4';
+const SHELL_CACHE = 'juniper-review-shell-v5';
 const SHELL = [
   './',
   './index.html',
@@ -19,6 +19,7 @@ const SHELL = [
   './manifest.webmanifest',
   './js/main.js',
   './js/build.js',
+  './js/update.js',
   './js/state.js',
   './js/pack-import.js',
   './js/verdict-export.js',
@@ -32,6 +33,14 @@ self.addEventListener('install', e => {
       .then(c => c.addAll(SHELL))
       .then(() => self.skipWaiting())
   );
+});
+
+// Allow the in-app refresh button to nudge a waiting SW to activate
+// immediately rather than waiting for the next cold start.
+self.addEventListener('message', e => {
+  if (e.data && e.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
 });
 
 self.addEventListener('activate', e => {

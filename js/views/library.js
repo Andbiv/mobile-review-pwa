@@ -1,6 +1,7 @@
 // Library view — list of imported packs.
 
 import { BUILD } from '../build.js';
+import { forceUpdate } from '../update.js';
 import { deletePack, listPacks, loadVerdictsForPack } from '../state.js';
 import { pickAndImportPack } from '../pack-import.js';
 import { exportPackVerdicts } from '../verdict-export.js';
@@ -15,6 +16,7 @@ export async function renderLibrary(container) {
       <div class="title">Juniper Review</div>
       <div class="actions">
         <span class="version-chip" title="PWA build identifier">${escapeHtml(BUILD)}</span>
+        <button class="subtle refresh-btn" id="refresh-btn" title="Force update from server" aria-label="Update">↻</button>
         <button class="primary" id="import-btn">+ Import pack</button>
       </div>
     </header>
@@ -23,6 +25,7 @@ export async function renderLibrary(container) {
     </div>
   `;
   document.getElementById('import-btn').addEventListener('click', onImport);
+  document.getElementById('refresh-btn').addEventListener('click', forceUpdate);
   await refresh();
 }
 

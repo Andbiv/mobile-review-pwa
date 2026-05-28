@@ -13,6 +13,7 @@
 // a verdict in IDB. Undo rolls back one decision.
 
 import { BUILD } from '../build.js';
+import { forceUpdate } from '../update.js';
 import {
   getCrop, getPack, listPacks, loadVerdictsForPack, putVerdict, deleteVerdict,
 } from '../state.js';
@@ -62,6 +63,7 @@ export async function renderReview(container, package_id) {
       <div class="title" id="hud-title">…</div>
       <div class="actions">
         <span class="version-chip" title="PWA build identifier">${escapeHtml(BUILD)}</span>
+        <button class="subtle refresh-btn" id="refresh-btn-r" title="Force update from server" aria-label="Update">↻</button>
         <button class="subtle nav-btn" id="prev-btn" aria-label="Previous">◀</button>
         <button class="subtle nav-btn" id="next-btn" aria-label="Next">▶</button>
         <button class="subtle" id="undo-btn" disabled>Undo</button>
@@ -95,6 +97,7 @@ export async function renderReview(container, package_id) {
   document.getElementById('undo-btn').addEventListener('click', () => undo(state));
   document.getElementById('prev-btn').addEventListener('click', () => goPrev(state));
   document.getElementById('next-btn').addEventListener('click', () => goNext(state));
+  document.getElementById('refresh-btn-r').addEventListener('click', forceUpdate);
 
   bindKeyboard(state);
   bindSwipeNav(document.getElementById('card-area'), state);
