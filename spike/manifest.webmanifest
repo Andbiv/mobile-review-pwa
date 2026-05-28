@@ -1,0 +1,11 @@
+{
+  "name": "Mobile Review Spike",
+  "short_name": "ReviewSpike",
+  "description": "Transport-validation spike for the mobile-review PWA",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#1565c0",
+  "orientation": "any"
+}

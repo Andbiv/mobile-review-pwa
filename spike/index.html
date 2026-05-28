@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Mobile Review — Transport Spike</title>
+<link rel="manifest" href="./manifest.webmanifest">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="ReviewSpike">
+<style>
+  :root{--ok:#2e7d32;--bad:#c62828;--blue:#1565c0;--gray:#616161;--bg:#f5f5f5}
+  html,body{margin:0;padding:0;font:16px/1.45 -apple-system,BlinkMacSystemFont,system-ui,sans-serif;color:#222;background:#fff}
+  body{max-width:46em;margin:0 auto;padding:env(safe-area-inset-top) 1em env(safe-area-inset-bottom)}
+  h1{font-size:1.4em;margin:.6em 0 .2em}
+  h2{font-size:1.1em;margin:1.4em 0 .3em;color:var(--blue)}
+  p,li{margin:.4em 0}
+  .chips{display:flex;flex-wrap:wrap;gap:.5em;margin:.6em 0 1em}
+  .chip{padding:.25em .6em;border-radius:1em;font-size:.85em;background:var(--bg);color:var(--gray)}
+  .chip.ok{background:#e8f5e9;color:var(--ok)}
+  .chip.bad{background:#ffebee;color:var(--bad)}
+  button{appearance:none;background:var(--blue);color:#fff;border:0;border-radius:.6em;
+         padding:1em 1.2em;font-size:1em;font-weight:600;cursor:pointer;width:100%;margin:.3em 0;
+         min-height:48px}
+  button.alt{background:#37474f}
+  button:disabled{background:#cfd8dc;color:#90a4ae}
+  .test{background:var(--bg);border-radius:.6em;padding:1em;margin:1em 0}
+  .test .result{font-family:ui-monospace,SF Mono,Menlo,Consolas,monospace;font-size:.85em;
+                background:#fff;border:1px solid #e0e0e0;border-radius:.4em;padding:.6em;
+                margin-top:.6em;white-space:pre-wrap;word-break:break-all;max-height:30em;overflow:auto}
+  .pass{color:var(--ok);font-weight:600}
+  .fail{color:var(--bad);font-weight:600}
+  .muted{color:var(--gray);font-size:.9em}
+  input[type=file]{display:none}
+  ol{padding-left:1.4em}
+  details{margin:.6em 0;background:#fff;border:1px solid #e0e0e0;border-radius:.4em;padding:.6em}
+  summary{cursor:pointer;font-weight:600}
+</style>
+</head>
+<body>
+
+<h1>Mobile Review — Transport Spike</h1>
+<p class="muted">Validates that an iOS Safari PWA can read pack zips from OneDrive and
+write verdict files back. If this works, we proceed to build the real PWA. If not, we
+redesign the transport before sinking a week into the exporter.</p>
+
+<div class="chips" id="env"></div>
+
+<details open>
+  <summary>Setup (do this once on the iPad)</summary>
+  <ol>
+    <li>Open this page in <b>Safari</b> on the iPad.</li>
+    <li>Tap the share button → <b>Add to Home Screen</b> → "ReviewSpike". This installs it as a PWA.</li>
+    <li>Open <b>ReviewSpike</b> from the home screen (not Safari).</li>
+    <li>Tap <b>"Generate test pack"</b> below → it'll download a small zip. When the Save sheet appears,
+        save to <b>OneDrive – BCI / MobileReview / test_pack.zip</b> (create the folder if needed).</li>
+    <li>Wait ~30 seconds for OneDrive to sync. Verify on the desktop that the file is there.</li>
+  </ol>
+  <button onclick="generateTestPack()">Generate test pack (downloads test_pack.zip)</button>
+</details>
+
+<h2>Test 1 — Read a zip from OneDrive</h2>
+<div class="test">
+  <p>Pick the test pack you just saved (or any zip from OneDrive). Verify the PWA can read its
+     contents through the iOS Files picker.</p>
+  <button onclick="document.getElementById('f1').click()">Pick a zip from Files</button>
+  <input type="file" id="f1" accept=".zip,application/zip" onchange="onPickZip(event,'r1')">
+  <div class="result" id="r1">Waiting…</div>
+</div>
+
+<h2>Test 2 — Write a verdict file back via share-sheet</h2>
+<div class="test">
+  <p>This generates a small JSON and triggers the iOS share-sheet. Pick <b>"Save to Files"</b>,
+     then navigate to <b>OneDrive – BCI / MobileReview</b> and save it. Then check the desktop in
+     a minute or two — the file should appear after OneDrive syncs.</p>
+  <button onclick="shareVerdict()">Generate test verdict + share</button>
+  <div class="result" id="r2">Waiting…</div>
+</div>
+
+<h2>Test 3 — Read a pinned zip with Airplane Mode ON</h2>
+<div class="test">
+  <p>The make-or-break test. Steps:</p>
+  <ol>
+    <li>In the <b>OneDrive iOS app</b>, find <code>test_pack.zip</code>. Tap <b>"⋯"</b> → <b>"Make available offline"</b>. Wait for the download icon to confirm it's pinned.</li>
+    <li>Enable <b>Airplane Mode</b> in iOS Control Center.</li>
+    <li>Tap below to pick the same zip. It should read fine even with no network.</li>
+  </ol>
+  <button onclick="document.getElementById('f3').click()">Pick the pinned zip (Airplane Mode ON)</button>
+  <input type="file" id="f3" accept=".zip,application/zip" onchange="onPickZip(event,'r3')">
+  <div class="result" id="r3">Waiting…</div>
+</div>
+
+<h2>Report results</h2>
+<p>Tell Claude which tests passed/failed, and paste any error messages from the result boxes.
+   If <i>all three</i> pass, the architecture holds and we proceed with Phase 1.</p>
+
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js" crossorigin="anonymous"></script>
+<script>
+// --- env chips ---
+function envChips(){
+  const c = document.getElementById('env');
+  const chips = [];
+  const standalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+  chips.push(standalone ? '<span class="chip ok">PWA standalone ✓</span>' : '<span class="chip bad">In Safari (not installed PWA)</span>');
+  chips.push(navigator.onLine ? '<span class="chip ok">Online</span>' : '<span class="chip bad">Offline</span>');
+  chips.push('canShare(files): ' + (navigator.canShare && navigator.canShare({files:[new File(['x'],'x.txt',{type:'text/plain'})]}) ? '<span class="chip ok">yes</span>' : '<span class="chip bad">no</span>'));
+  c.innerHTML = chips.join('');
+}
+envChips();
+window.addEventListener('online', envChips);
+window.addEventListener('offline', envChips);
+
+// --- service worker ---
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./sw.js').catch(e => console.warn('SW register failed:', e));
+}
+
+// --- helpers ---
+function log(id, lines, status){
+  const el = document.getElementById(id);
+  const prefix = status === 'pass' ? '<div class="pass">✓ PASS</div>' :
+                 status === 'fail' ? '<div class="fail">✗ FAIL</div>' : '';
+  el.innerHTML = prefix + lines.map(l => l.replace(/&/g,'&amp;').replace(/</g,'&lt;')).join('\n');
+}
+
+// --- test pack generator (Setup) ---
+async function generateTestPack(){
+  try {
+    const zip = new JSZip();
+    zip.file('manifest.json', JSON.stringify({
+      package_id: 'spike_test_pack',
+      job_id: 'spike_2026-05-28',
+      count: 3,
+      created_at: new Date().toISOString(),
+      note: 'Synthetic test pack for the mobile-review PWA spike.'
+    }, null, 2));
+    zip.file('detections.json', JSON.stringify([
+      {det_id: 'spike_a', cls: 'juniper', conf: 0.92, prior_decision: null},
+      {det_id: 'spike_b', cls: 'juniper', conf: 0.41, prior_decision: null},
+      {det_id: 'spike_c', cls: 'mesquite', conf: 0.18, prior_decision: 'FP'}
+    ], null, 2));
+    // 3 tiny "crop" placeholders — single-pixel data URIs so the zip is < 1 KB
+    const px = atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=');
+    const bytes = new Uint8Array(px.length); for (let i=0;i<px.length;i++) bytes[i]=px.charCodeAt(i);
+    zip.file('crops/spike_a.jpg', bytes); zip.file('crops/spike_b.jpg', bytes); zip.file('crops/spike_c.jpg', bytes);
+    const blob = await zip.generateAsync({type:'blob', mimeType:'application/zip'});
+    // Try share API first (iOS-native save destination picker), fall back to <a download>
+    const file = new File([blob], 'test_pack.zip', {type:'application/zip'});
+    if (navigator.canShare && navigator.canShare({files:[file]})) {
+      await navigator.share({files:[file], title:'test_pack.zip'});
+    } else {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = 'test_pack.zip';
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(()=>URL.revokeObjectURL(url), 1000);
+    }
+  } catch (e) {
+    alert('Could not generate test pack: ' + e.message);
+  }
+}
+
+// --- Test 1 / Test 3: read a zip from Files ---
+async function onPickZip(ev, resultId){
+  const file = ev.target.files[0];
+  if (!file) return log(resultId, ['(no file selected)'], 'fail');
+  const lines = [`Picked: ${file.name} (${file.size.toLocaleString()} bytes, type="${file.type}")`,
+                 `Online at time of pick: ${navigator.onLine}`];
+  try {
+    const buf = await file.arrayBuffer();
+    lines.push(`Read ArrayBuffer OK: ${buf.byteLength.toLocaleString()} bytes`);
+    const zip = await JSZip.loadAsync(buf);
+    const entries = [];
+    zip.forEach((path, entry) => entries.push((entry.dir?'[dir] ':'      ') + path + (entry.dir?'':' ('+entry._data.uncompressedSize+'b)')));
+    lines.push(`Unzipped OK. ${entries.length} entries:`);
+    lines.push(...entries.slice(0,20));
+    if (entries.length > 20) lines.push(`… and ${entries.length-20} more`);
+    // Try to read the manifest if present
+    const m = zip.file('manifest.json');
+    if (m) {
+      const txt = await m.async('string');
+      lines.push('', 'manifest.json:', txt);
+    }
+    log(resultId, lines, 'pass');
+  } catch (e) {
+    lines.push('', 'ERROR: ' + e.message);
+    log(resultId, lines, 'fail');
+  }
+}
+
+// --- Test 2: share a verdict JSON ---
+async function shareVerdict(){
+  const lines = [];
+  try {
+    const verdict = {
+      package_id: 'spike_test_pack',
+      reviewer: 'spike',
+      device: navigator.userAgent.split(' ').pop(),
+      created_at: new Date().toISOString(),
+      items: [
+        {det_id:'spike_a', decision:'TP'},
+        {det_id:'spike_b', decision:'FP'},
+        {det_id:'spike_c', decision:'SKIP'}
+      ]
+    };
+    const blob = new Blob([JSON.stringify(verdict, null, 2)], {type:'application/json'});
+    const file = new File([blob], 'verdicts_spike_test_pack.json', {type:'application/json'});
+    lines.push(`Verdict blob: ${blob.size} bytes`);
+    lines.push(`File: ${file.name} (${file.type})`);
+    lines.push(`navigator.canShare({files}): ${navigator.canShare && navigator.canShare({files:[file]})}`);
+    if (navigator.canShare && navigator.canShare({files:[file]})) {
+      await navigator.share({files:[file], title:file.name});
+      lines.push('', 'Share sheet completed (or was cancelled).');
+      lines.push('→ Check that you picked "Save to Files" → OneDrive – BCI / MobileReview / and the file landed there.');
+      lines.push('→ After ~1 min, verify it appears on the desktop OneDrive folder.');
+      log('r2', lines, 'pass');
+    } else {
+      lines.push('', 'Share API not available — falling back to download.');
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = file.name;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(()=>URL.revokeObjectURL(url), 1000);
+      lines.push('This is a worse UX than share-sheet (saves to Downloads, not picker).');
+      log('r2', lines, 'fail');
+    }
+  } catch (e) {
+    lines.push('', 'ERROR: ' + e.message);
+    log('r2', lines, 'fail');
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,13 @@
+# macOS
+.DS_Store
+# Windows
+Thumbs.db
+desktop.ini
+# Editors
+.vscode/
+.idea/
+*.swp
+# Dependencies (if we add a build later)
+node_modules/
+dist/
+build/
