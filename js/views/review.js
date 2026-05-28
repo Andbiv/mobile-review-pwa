@@ -43,11 +43,24 @@ export async function renderReview(container, package_id) {
 
   const verdicts = await loadVerdictsForPack(package_id);
 
-  // Find resume position: first detection without a verdict.
+  // Deep-link support: #review/<pkg>?det=<det_id> jumps straight to that
+  // detection, e.g. when the map view drilled in on a specific tree.
   let cursor = 0;
-  for (let i = 0; i < pack.detections.length; i++) {
-    if (!verdicts.has(pack.detections[i].det_id)) { cursor = i; break; }
-    if (i === pack.detections.length - 1) cursor = pack.detections.length; // all done
+  const qIndex = location.hash.indexOf('?');
+  let targetDetId = null;
+  if (qIndex !== -1) {
+    const params = new URLSearchParams(location.hash.slice(qIndex + 1));
+    targetDetId = params.get('det');
+  }
+  if (targetDetId) {
+    const idx = pack.detections.findIndex(d => d.det_id === targetDetId);
+    if (idx !== -1) cursor = idx;
+  } else {
+    // Resume position: first detection without a verdict.
+    for (let i = 0; i < pack.detections.length; i++) {
+      if (!verdicts.has(pack.detections[i].det_id)) { cursor = i; break; }
+      if (i === pack.detections.length - 1) cursor = pack.detections.length; // all done
+    }
   }
 
   const state = {

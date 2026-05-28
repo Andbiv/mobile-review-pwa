@@ -11,7 +11,7 @@
 // same as Cache Storage. One eviction surface = simpler offline reasoning.
 
 const DB_NAME = 'juniper-review';
-const DB_VERSION = 1;
+const DB_VERSION = 2;  // v2 adds the `adds` store for Cut 4 missed-tree records
 
 /** @type {IDBDatabase|null} */
 let _db = null;
@@ -32,6 +32,13 @@ export function openDb() {
       }
       if (!db.objectStoreNames.contains('crops')) {
         db.createObjectStore('crops', { keyPath: ['package_id', 'det_id'] });
+      }
+      // v2: missed-tree adds drawn on the map view (Cut 4). Keyed by add_uuid
+      // generated locally with crypto.randomUUID(). by_job index lets the
+      // export-adds flow gather every add for a given flight in one shot.
+      if (!db.objectStoreNames.contains('adds')) {
+        const s = db.createObjectStore('adds', { keyPath: 'add_uuid' });
+        s.createIndex('by_job', 'job_id', { unique: false });
       }
     };
     req.onsuccess = () => { _db = req.result; resolve(_db); };
@@ -179,4 +186,60 @@ export async function loadVerdictsForPack(package_id) {
   const map = new Map();
   for (const r of rows) map.set(r.det_id, r);
   return map;
+}
+
+/** Map(det_id -> Verdict) across ALL packs — used by the map view to color
+ *  every detection by its current decision state. */
+export async function loadAllVerdicts() {
+  const db = await openDb();
+  const tx = db.transaction('verdicts', 'readonly');
+  const rows = await _req(tx.objectStore('verdicts').getAll());
+  const map = new Map();
+  for (const r of rows) map.set(r.det_id, r);
+  return map;
+}
+
+// ---------------------------------------------------------------- adds
+
+/**
+ * @typedef {Object} AddRecord
+ * @property {string} add_uuid
+ * @property {string} job_id
+ * @property {string} ortho_id
+ * @property {object} geom_wgs84       GeoJSON Point/Polygon in EPSG:4326
+ * @property {number} [radius_m]        For circle adds: radius in meters
+ * @property {'mobile'} source
+ * @property {string} created_at        ISO UTC
+ * @property {?string} [cls]
+ * @property {?string} [note]
+ */
+
+/** @param {AddRecord} add */
+export async function putAdd(add) {
+  const db = await openDb();
+  const tx = db.transaction('adds', 'readwrite');
+  tx.objectStore('adds').put(add);
+  return _tx(tx);
+}
+
+export async function deleteAdd(add_uuid) {
+  const db = await openDb();
+  const tx = db.transaction('adds', 'readwrite');
+  tx.objectStore('adds').delete(add_uuid);
+  return _tx(tx);
+}
+
+/** All adds across every job. */
+export async function listAllAdds() {
+  const db = await openDb();
+  const tx = db.transaction('adds', 'readonly');
+  return _req(tx.objectStore('adds').getAll());
+}
+
+/** Adds scoped to one job (by job_id stamped from the pack manifest). */
+export async function listAddsForJob(job_id) {
+  const db = await openDb();
+  const tx = db.transaction('adds', 'readonly');
+  const idx = tx.objectStore('adds').index('by_job');
+  return _req(idx.getAll(IDBKeyRange.only(job_id)));
 }

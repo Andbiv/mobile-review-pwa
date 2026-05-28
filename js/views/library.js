@@ -3,6 +3,7 @@
 import { BUILD } from '../build.js';
 import { forceUpdate } from '../update.js';
 import { deletePack, listPacks, loadVerdictsForPack } from '../state.js';
+import { getOrthoStatus } from '../ortho.js';
 import { pickAndImportPacks } from '../pack-import.js';
 import { exportPackVerdicts } from '../verdict-export.js';
 
@@ -17,6 +18,7 @@ export async function renderLibrary(container) {
       <div class="actions">
         <span class="version-chip" title="PWA build identifier">${escapeHtml(BUILD)}</span>
         <button class="subtle refresh-btn" id="refresh-btn" title="Force update from server" aria-label="Update">↻</button>
+        <button class="subtle refresh-btn" id="map-btn" title="Open the map view" aria-label="Map">🗺</button>
         <button class="primary" id="import-btn">+ Import packs</button>
       </div>
     </header>
@@ -26,6 +28,7 @@ export async function renderLibrary(container) {
   `;
   document.getElementById('import-btn').addEventListener('click', onImport);
   document.getElementById('refresh-btn').addEventListener('click', forceUpdate);
+  document.getElementById('map-btn').addEventListener('click', () => { location.hash = '#map'; });
   await refresh();
 }
 

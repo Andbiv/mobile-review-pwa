@@ -5,6 +5,7 @@
 
 import { ensurePersistence, openDb } from './state.js';
 import { renderLibrary } from './views/library.js';
+import { renderMap } from './views/map.js';
 import { renderReview } from './views/review.js';
 
 /** @type {HTMLElement} */
@@ -21,8 +22,14 @@ async function route() {
   const hash = location.hash.replace(/^#/, '');
   try {
     if (hash.startsWith('review/')) {
-      const packageId = decodeURIComponent(hash.slice('review/'.length));
+      // Tail can be `<package_id>` or `<package_id>?det=<det_id>` (deep-link
+      // from the map). The review view reads `?det=...` from location.hash
+      // itself, so we just pass the package_id.
+      const rest = hash.slice('review/'.length);
+      const packageId = decodeURIComponent(rest.split('?')[0]);
       await renderReview(appEl, packageId);
+    } else if (hash === 'map' || hash.startsWith('map/')) {
+      await renderMap(appEl);
     } else {
       await renderLibrary(appEl);
     }
