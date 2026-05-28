@@ -228,7 +228,10 @@ async function renderMapWithOrtho() {
   const map = new ol.Map({
     target: 'map-canvas',
     layers: [baseLayer, overlay, addsLayer],
-    view: await source.getView(),
+    // source.getView() returns a Promise in OL v10. The Map constructor
+    // accepts and resolves it internally — pass the Promise, NOT the
+    // awaited value (await + Map constructor = "i.view.then is undefined").
+    view: source.getView(),
     controls: ol.control.defaults.defaults({ rotate: false, attribution: false }),
   });
 
