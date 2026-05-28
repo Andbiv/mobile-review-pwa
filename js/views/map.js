@@ -17,11 +17,12 @@ import {
 } from '../ortho.js';
 import { exportAddsForJob } from '../adds-export.js';
 
-const OL_VERSION = '10.5.0';
-const GEOTIFF_VERSION = '2.1.3';
-const OL_JS = `https://cdn.jsdelivr.net/npm/ol@${OL_VERSION}/dist/ol.js`;
-const OL_CSS = `https://cdn.jsdelivr.net/npm/ol@${OL_VERSION}/ol.css`;
-const GEOTIFF_JS = `https://cdn.jsdelivr.net/npm/geotiff@${GEOTIFF_VERSION}/dist-browser/geotiff.js`;
+// Vendored locally so we never depend on CDN behavior. Both files live in
+// /vendor/ and are part of the SW shell cache — they work offline after
+// the PWA's first online launch.
+const OL_JS = './vendor/ol.js';
+const OL_CSS = './vendor/ol.css';
+const GEOTIFF_JS = './vendor/geotiff.js';
 
 const STYLE_BY_DECISION = {
   null:    { stroke: 'rgba(255, 255, 0, 0.95)', fill: 'rgba(255, 255, 0, 0.10)' },
@@ -34,31 +35,41 @@ const STYLE_BY_DECISION = {
 /**
  * Lazy-load OpenLayers + geotiff.js (only when the map view is opened).
  *
- * Loading geotiff.js BEFORE ol.js is load-bearing: the OL v10 UMD bundle
- * externalizes the geotiff peer dep and expects the `GeoTIFF` global to
- * exist at module-init time. Without it, OL's source.GeoTIFF throws
- * "Can't find variable: tiff" on first use.
+ * Loading order matters: geotiff.js sets window.GeoTIFF; ol.js then
+ * looks that global up at module-init time. Sequential load + verification
+ * that the global actually exists after each step so a quiet failure is
+ * surfaced with a useful error rather than a generic "Can't find variable".
  */
 let _olLoaded = false;
 async function loadOl() {
   if (_olLoaded || typeof ol !== 'undefined') { _olLoaded = true; return; }
-  await new Promise((resolve, reject) => {
-    const link = document.createElement('link');
-    link.rel = 'stylesheet'; link.href = OL_CSS;
-    document.head.appendChild(link);
 
-    const loadScript = (src) => new Promise((res, rej) => {
-      const s = document.createElement('script');
-      s.src = src; s.crossOrigin = 'anonymous';
-      s.onload = res;
-      s.onerror = () => rej(new Error(`Failed to load ${src} — first-time map load needs Internet.`));
-      document.head.appendChild(s);
-    });
+  const link = document.createElement('link');
+  link.rel = 'stylesheet'; link.href = OL_CSS;
+  document.head.appendChild(link);
 
-    loadScript(GEOTIFF_JS)
-      .then(() => loadScript(OL_JS))
-      .then(resolve, reject);
+  const loadScript = (src) => new Promise((res, rej) => {
+    const s = document.createElement('script');
+    s.src = src;
+    s.onload = res;
+    s.onerror = () => rej(new Error(`Failed to load ${src}`));
+    document.head.appendChild(s);
   });
+
+  await loadScript(GEOTIFF_JS);
+  if (typeof GeoTIFF === 'undefined') {
+    throw new Error(
+      'vendor/geotiff.js loaded but window.GeoTIFF is undefined. ' +
+      'The vendored UMD file may be corrupt — re-download.'
+    );
+  }
+  await loadScript(OL_JS);
+  if (typeof ol === 'undefined' || !ol.source || !ol.source.GeoTIFF) {
+    throw new Error(
+      'vendor/ol.js loaded but ol.source.GeoTIFF is missing. ' +
+      'The vendored OpenLayers UMD may not include the GeoTIFF source.'
+    );
+  }
   _olLoaded = true;
 }
 

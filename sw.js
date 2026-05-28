@@ -11,7 +11,7 @@
 // on activate and forces fresh fetches of HTML/JS/CSS. iOS Safari is sticky
 // about cached shells otherwise. (And the BUILD constant in js/build.js
 // shows the version in the PWA header so you can verify which is live.)
-const SHELL_CACHE = 'juniper-review-shell-v11';
+const SHELL_CACHE = 'juniper-review-shell-v12';
 const SHELL = [
   './',
   './index.html',
@@ -28,6 +28,9 @@ const SHELL = [
   './js/views/library.js',
   './js/views/map.js',
   './js/views/review.js',
+  './vendor/geotiff.js',
+  './vendor/ol.js',
+  './vendor/ol.css',
 ];
 
 self.addEventListener('install', e => {

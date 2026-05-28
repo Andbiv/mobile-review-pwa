@@ -8,8 +8,10 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="OPFS Spike">
 
-<!-- OpenLayers v10+ has built-in COG-from-Blob support via ol/source/GeoTIFF -->
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ol@10.5.0/ol.css">
+<!-- OpenLayers v10+ has built-in COG-from-Blob support via ol/source/GeoTIFF.
+     We vendor both ol.js + ol.css and geotiff.js in ../vendor/ so the load
+     order is deterministic and not subject to CDN/global-name surprises. -->
+<link rel="stylesheet" href="../vendor/ol.css">
 
 <style>
   :root { --ok:#2e7d32; --bad:#c62828; --blue:#1565c0; --gray:#616161; --bg:#f5f5f5; }
@@ -94,9 +96,10 @@
 </div>
 
 <!-- geotiff.js must load BEFORE ol.js — the OL UMD bundle externalizes the
-     geotiff dep and looks for it as a global at module-init time. -->
-<script src="https://cdn.jsdelivr.net/npm/geotiff@2.1.3/dist-browser/geotiff.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/ol@10.5.0/dist/ol.js"></script>
+     geotiff dep and looks for the GeoTIFF global at module-init time.
+     Same-origin vendor files: no CDN unknowns. -->
+<script src="../vendor/geotiff.js"></script>
+<script src="../vendor/ol.js"></script>
 <script>
 // ---------- env detection ----------
 function envCheck() {
