@@ -18,8 +18,10 @@ import {
 import { exportAddsForJob } from '../adds-export.js';
 
 const OL_VERSION = '10.5.0';
+const GEOTIFF_VERSION = '2.1.3';
 const OL_JS = `https://cdn.jsdelivr.net/npm/ol@${OL_VERSION}/dist/ol.js`;
 const OL_CSS = `https://cdn.jsdelivr.net/npm/ol@${OL_VERSION}/ol.css`;
+const GEOTIFF_JS = `https://cdn.jsdelivr.net/npm/geotiff@${GEOTIFF_VERSION}/dist-browser/geotiff.js`;
 
 const STYLE_BY_DECISION = {
   null:    { stroke: 'rgba(255, 255, 0, 0.95)', fill: 'rgba(255, 255, 0, 0.10)' },
@@ -30,7 +32,12 @@ const STYLE_BY_DECISION = {
 };
 
 /**
- * Lazy-load OpenLayers (only when the map view is opened).
+ * Lazy-load OpenLayers + geotiff.js (only when the map view is opened).
+ *
+ * Loading geotiff.js BEFORE ol.js is load-bearing: the OL v10 UMD bundle
+ * externalizes the geotiff peer dep and expects the `GeoTIFF` global to
+ * exist at module-init time. Without it, OL's source.GeoTIFF throws
+ * "Can't find variable: tiff" on first use.
  */
 let _olLoaded = false;
 async function loadOl() {
@@ -40,15 +47,17 @@ async function loadOl() {
     link.rel = 'stylesheet'; link.href = OL_CSS;
     document.head.appendChild(link);
 
-    const script = document.createElement('script');
-    script.src = OL_JS;
-    script.crossOrigin = 'anonymous';
-    script.onload = resolve;
-    script.onerror = () => reject(new Error(
-      `Failed to load OpenLayers from CDN (${OL_JS}). ` +
-      `Check network — first-time map load needs Internet to fetch the library.`
-    ));
-    document.head.appendChild(script);
+    const loadScript = (src) => new Promise((res, rej) => {
+      const s = document.createElement('script');
+      s.src = src; s.crossOrigin = 'anonymous';
+      s.onload = res;
+      s.onerror = () => rej(new Error(`Failed to load ${src} — first-time map load needs Internet.`));
+      document.head.appendChild(s);
+    });
+
+    loadScript(GEOTIFF_JS)
+      .then(() => loadScript(OL_JS))
+      .then(resolve, reject);
   });
   _olLoaded = true;
 }
