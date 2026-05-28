@@ -2,4 +2,4 @@
 // verify on the iPad which version is loaded after a cache update.
 //
 // Format: vMAJOR.MINOR.PATCH · YYYY-MM-DDTHH:MMZ
-export const BUILD = 'v0.1.4 · 2026-05-28T19:30Z';
+export const BUILD = 'v0.1.5 · 2026-05-28T19:50Z';

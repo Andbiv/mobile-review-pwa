@@ -147,6 +147,13 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
   object-fit: contain; border-radius: 0.6em;
   box-shadow: 0 4px 20px rgba(0,0,0,0.5);
 }
+/* Verdict color outline on the card image itself — visible from across
+   the room, so the "polygon color" reads correctly per-card without
+   re-rendering the JPEG. Outline-offset is negative so it sits INSIDE
+   the image's rounded corners. */
+.review .card-img.verdict-TP   { outline: 8px solid var(--tp);   outline-offset: -8px; }
+.review .card-img.verdict-FP   { outline: 8px solid var(--fp);   outline-offset: -8px; }
+.review .card-img.verdict-SKIP { outline: 8px solid var(--skip); outline-offset: -8px; }
 .review .swipe-hint {
   position: absolute; top: 1em; left: 0; right: 0;
   text-align: center; color: var(--text-muted); font-size: 0.85em;

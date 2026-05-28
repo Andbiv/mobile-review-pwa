@@ -14,10 +14,10 @@
 
 import { BUILD } from '../build.js';
 import {
-  getCrop, getPack, loadVerdictsForPack, putVerdict, deleteVerdict,
+  getCrop, getPack, listPacks, loadVerdictsForPack, putVerdict, deleteVerdict,
 } from '../state.js';
 
-const SWIPE_THRESHOLD_PX = 80;
+const SWIPE_THRESHOLD_PX = 60;
 
 /**
  * @param {HTMLElement} container
@@ -72,7 +72,7 @@ export async function renderReview(container, package_id) {
     <section class="review">
       <div class="hud" id="hud-badges"></div>
       <div class="card-area" id="card-area">
-        <div class="swipe-hint">⇽ FP &nbsp;·&nbsp; SKIP ⤴ &nbsp;·&nbsp; TP ⇾</div>
+        <div class="swipe-hint">⇽ Prev &nbsp;·&nbsp; Next ⇾ &nbsp;·&nbsp; keys: A / D / S</div>
         <img class="card-img" id="card-img" alt="">
       </div>
       <div class="toggle-row" id="toggle-row">
@@ -97,7 +97,7 @@ export async function renderReview(container, package_id) {
   document.getElementById('next-btn').addEventListener('click', () => goNext(state));
 
   bindKeyboard(state);
-  bindSwipe(document.getElementById('card-area'), state);
+  bindSwipeNav(document.getElementById('card-area'), state);
 
   await refresh(state);
 }
@@ -119,26 +119,35 @@ async function refresh(state) {
   document.getElementById('prev-btn').disabled = cursor <= 0;
   document.getElementById('next-btn').disabled = cursor >= total;
 
-  // End state — keep nav usable so the user can Prev back to audit.
+  // End state — keep nav usable so the user can Prev back to audit. Also
+  // offer to jump to the next unfinished pack so the reviewer doesn't
+  // have to bounce through the library between packs.
   if (cursor >= total) {
     document.getElementById('hud-title').textContent =
       `${reviewed}/${total} reviewed`;
     document.getElementById('hud-badges').innerHTML =
       '<span class="badge">end of pack</span>';
-    // Replace the card-area contents but keep the element so prev/next still work.
+    const nextPack = await findNextUnfinishedPack(pack.package_id);
+    const nextPackBtn = nextPack
+      ? `<button class="primary" id="goto-next-pack">→ Next pack (${escapeHtml(nextPack.package_id)})</button>`
+      : '';
     const cardArea = document.getElementById('card-area');
     cardArea.innerHTML = `
       <div class="done-state">
         <div class="big">🎉 Pack complete</div>
         <div>${reviewed} of ${total} reviewed.</div>
-        <div class="btn-row" style="justify-content:center; gap:0.6em">
+        <div class="btn-row" style="justify-content:center; gap:0.6em; flex-wrap:wrap">
+          ${nextPackBtn}
           <button class="subtle" id="audit-from-start">Review from start</button>
-          <button class="primary" onclick="location.hash='#library'">Back to library</button>
+          <button class="subtle" onclick="location.hash='#library'">Back to library</button>
         </div>
       </div>`;
     document.getElementById('audit-from-start')?.addEventListener('click', () => {
       state.cursor = 0;
       refresh(state);
+    });
+    document.getElementById('goto-next-pack')?.addEventListener('click', () => {
+      location.hash = `#review/${encodeURIComponent(nextPack.package_id)}`;
     });
     document.getElementById('toggle-row').style.display = 'none';
     document.getElementById('verdict-row').style.display = 'none';
@@ -181,7 +190,8 @@ async function refresh(state) {
     ${currentChip}
   `;
 
-  // Image
+  // Image — verdict colors the outline so the polygon's "color" reflects
+  // the decision (TP green, FP red, SKIP gray, undecided no outline).
   const key = state.chmFirst ? `${det.det_id}_chm` : `${det.det_id}_rgb`;
   const blob = await getCrop(pack.package_id, key);
   const img = document.getElementById('card-img');
@@ -193,6 +203,8 @@ async function refresh(state) {
     img.src = '';
     img.alt = `missing crop ${key}`;
   }
+  img.classList.remove('verdict-TP', 'verdict-FP', 'verdict-SKIP');
+  if (existing) img.classList.add(`verdict-${existing.decision}`);
 
   // Toggle highlights
   document.getElementById('tg-chm').classList.toggle('on', state.chmFirst);
@@ -207,6 +219,18 @@ async function refresh(state) {
     const map = { TP: 'btn-tp', FP: 'btn-fp', SKIP: 'btn-skip' };
     document.getElementById(map[existing.decision])?.classList.add('active');
   }
+}
+
+async function findNextUnfinishedPack(currentPackId) {
+  const packs = await listPacks();
+  // Stable order = oldest imported first; matches how the library shows them.
+  packs.sort((a, b) => (a.imported_at || '').localeCompare(b.imported_at || ''));
+  for (const p of packs) {
+    if (p.package_id === currentPackId) continue;
+    const v = await loadVerdictsForPack(p.package_id);
+    if (v.size < p.detections.length) return p;
+  }
+  return null;
 }
 
 async function goPrev(state) {
@@ -265,8 +289,10 @@ function bindKeyboard(state) {
   window.addEventListener('keydown', (ev) => {
     if (location.hash.indexOf('#review/') !== 0) return;
     const k = ev.key.toLowerCase();
-    if (k === 't' || k === '1') { ev.preventDefault(); applyVerdict(state, 'TP'); }
-    else if (k === 'f' || k === '2') { ev.preventDefault(); applyVerdict(state, 'FP'); }
+    // Verdict keys — A/D/S match the desktop reviewer; T/F/S kept as
+    // alternates from the original spec; 1/2/3 for keyboard heavy users.
+    if (k === 'a' || k === 't' || k === '1') { ev.preventDefault(); applyVerdict(state, 'TP'); }
+    else if (k === 'd' || k === 'f' || k === '2') { ev.preventDefault(); applyVerdict(state, 'FP'); }
     else if (k === 's' || k === '3') { ev.preventDefault(); applyVerdict(state, 'SKIP'); }
     else if (k === 'u') { ev.preventDefault(); undo(state); }
     else if (k === 'c') { ev.preventDefault(); state.chmFirst = !state.chmFirst; refresh(state); }
@@ -276,10 +302,13 @@ function bindKeyboard(state) {
 }
 
 /**
- * PointerEvents-based swipe. Unified API on iOS 13+ and modern desktops.
- * Avoids the touchstart/mousedown + preventDefault quirks of older iOS.
+ * Swipe gestures = NAVIGATION (right=next, left=prev). Verdicts are via
+ * buttons or keyboard. Per user feedback: arrows mean "move between cards",
+ * not "judge this card". Up-swipe is intentionally unbound — the SKIP
+ * button + S key suffice.
  */
-function bindSwipe(cardArea, state) {
+function bindSwipeNav(cardArea, state) {
+
   let start = null;
   cardArea.addEventListener('pointerdown', ev => {
     if (ev.button && ev.button !== 0) return;
@@ -292,11 +321,11 @@ function bindSwipe(cardArea, state) {
     const dy = ev.clientY - start.y;
     start = null;
     const adx = Math.abs(dx), ady = Math.abs(dy);
-    if (adx < SWIPE_THRESHOLD_PX && ady < SWIPE_THRESHOLD_PX) return;
-    if (adx > ady) {
-      applyVerdict(state, dx > 0 ? 'TP' : 'FP');
-    } else if (dy < 0) {
-      applyVerdict(state, 'SKIP');
+    if (adx < SWIPE_THRESHOLD_PX) return;
+    // Treat as horizontal swipe only if x movement clearly dominates,
+    // so vertical scrolls of the page don't accidentally navigate.
+    if (adx > ady * 1.5) {
+      if (dx > 0) goNext(state); else goPrev(state);
     }
   });
   cardArea.addEventListener('pointercancel', () => { start = null; });
