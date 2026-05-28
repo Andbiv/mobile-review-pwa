@@ -3,7 +3,7 @@
 import { BUILD } from '../build.js';
 import { forceUpdate } from '../update.js';
 import { deletePack, listPacks, loadVerdictsForPack } from '../state.js';
-import { pickAndImportPack } from '../pack-import.js';
+import { pickAndImportPacks } from '../pack-import.js';
 import { exportPackVerdicts } from '../verdict-export.js';
 
 /**
@@ -17,7 +17,7 @@ export async function renderLibrary(container) {
       <div class="actions">
         <span class="version-chip" title="PWA build identifier">${escapeHtml(BUILD)}</span>
         <button class="subtle refresh-btn" id="refresh-btn" title="Force update from server" aria-label="Update">↻</button>
-        <button class="primary" id="import-btn">+ Import pack</button>
+        <button class="primary" id="import-btn">+ Import packs</button>
       </div>
     </header>
     <div class="library" id="library-list">
@@ -36,8 +36,10 @@ async function refresh() {
     listEl.innerHTML = `
       <div class="empty">
         <div class="big">No packs imported yet.</div>
-        <div>Tap <b>+ Import pack</b> to open a <code>pack_NNN.zip</code> from
-             OneDrive – BCI / GIS / BrushDrone / MobileReview.</div>
+        <div>Tap <b>+ Import packs</b> → navigate to <b>OneDrive – BCI /
+             GIS / BrushDrone / MobileReview</b> → select one or more
+             <code>pack_NNN.zip</code> files. You can tap multiple to
+             import them all at once.</div>
       </div>`;
     return;
   }
@@ -109,11 +111,19 @@ function hasNewSinceExport(pack, verdictsMap) {
 
 async function onImport() {
   try {
-    const package_id = await pickAndImportPack(modalConfirm);
-    if (package_id) {
-      window.showToast(`Imported pack "${package_id}"`, 'ok');
-      await refresh();
-    }
+    const r = await pickAndImportPacks();
+    const total = r.imported.length + r.skipped.length + r.errors.length;
+    if (total === 0) return;  // user cancelled the picker
+    const parts = [];
+    if (r.imported.length) parts.push(`✓ Imported ${r.imported.length}`);
+    if (r.skipped.length) parts.push(`${r.skipped.length} already in library`);
+    if (r.errors.length) parts.push(`${r.errors.length} failed`);
+    window.showToast(
+      parts.join(' · '),
+      r.errors.length ? 'err' : 'ok',
+      r.errors.length ? 6000 : 3500,
+    );
+    await refresh();
   } catch (e) {
     console.error(e);
     window.showToast(`Import failed: ${e.message}`, 'err', 4000);

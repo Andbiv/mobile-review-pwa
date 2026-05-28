@@ -5,34 +5,49 @@ import { deletePack, getPack, openDb, putCrop, putPack } from './state.js';
 const SUPPORTED_FORMAT_VERSION = 1;
 
 /**
- * Open the iOS Files-app picker for a single .zip and import it.
- * Returns the imported pack's package_id (or null if user cancelled).
+ * Open the iOS Files-app picker with multi-select and import every chosen
+ * .zip. Returns a summary of what happened so the caller can show one
+ * toast for the whole batch.
  *
- * If a pack with the same package_id already exists, prompts the user
- * to replace it. Verdicts indexed by (det_id, package_id) survive a
- * replace because they live in a separate object store.
+ * Behavior on duplicates: in batch mode we **skip silently** rather than
+ * prompt N times. To replace an already-imported pack, the user can
+ * Delete it from the library and re-import. This keeps the multi-select
+ * flow from blocking on a modal for every duplicate.
  *
- * @param {(msg:string)=>boolean|Promise<boolean>} confirmFn
- *        Async confirm function the caller provides — typically a modal.
- *        Must return true if the user agrees to replace.
- * @returns {Promise<?string>} package_id imported, or null on cancel.
+ * @returns {Promise<{imported: string[], skipped: string[],
+ *                    errors: {name:string, message:string}[]}>}
  */
-export async function pickAndImportPack(confirmFn) {
-  const file = await pickZipFile();
-  if (!file) return null;
-  return await importPackZip(file, confirmFn);
+export async function pickAndImportPacks() {
+  const files = await pickZipFiles();
+  const result = { imported: [], skipped: [], errors: [] };
+  for (const file of files) {
+    try {
+      // Pass a confirmFn that always declines so importPackZip silently
+      // skips duplicates in batch mode rather than waiting for a modal.
+      const id = await importPackZip(file, () => false);
+      if (id) result.imported.push(id);
+      else result.skipped.push(file.name);
+    } catch (e) {
+      console.error(`import failed for ${file.name}:`, e);
+      result.errors.push({ name: file.name, message: e.message });
+    }
+  }
+  return result;
 }
 
 /**
- * Show an <input type=file> and resolve with the picked File (or null).
+ * Show an <input type=file multiple> and resolve with the picked Files
+ * (or an empty array on cancel). Multi-select is enabled so the user
+ * can tap every pack in the OneDrive folder in one go.
  */
-function pickZipFile() {
+function pickZipFiles() {
   return new Promise(resolve => {
     const inp = document.createElement('input');
     inp.type = 'file';
     inp.accept = '.zip,application/zip';
+    inp.multiple = true;
     inp.style.display = 'none';
-    inp.addEventListener('change', () => resolve(inp.files[0] || null), { once: true });
+    inp.addEventListener('change', () => resolve([...(inp.files || [])]), { once: true });
     document.body.appendChild(inp);
     inp.click();
     // Cleanup later — leave in DOM until change fires so iOS doesn't drop it.
