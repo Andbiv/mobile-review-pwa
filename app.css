@@ -237,6 +237,9 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
   padding: 0.7em 1.2em; border-radius: 0.5em;
   border: 1px solid var(--border); z-index: 200;
   font-size: 0.9em;
+  max-width: calc(100vw - 2em);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .toast.ok { border-color: var(--tp); }
 .toast.err { border-color: var(--fp); }
+.toast.progress { border-color: var(--accent); color: var(--text); }

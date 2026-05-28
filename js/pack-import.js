@@ -17,10 +17,20 @@ const SUPPORTED_FORMAT_VERSION = 1;
  * @returns {Promise<{imported: string[], skipped: string[],
  *                    errors: {name:string, message:string}[]}>}
  */
-export async function pickAndImportPacks() {
+/**
+ * @param {(p:{index:number,total:number,file:string,phase:string})=>void} [onProgress]
+ *        Optional progress callback fired before each file's unzip starts.
+ *        Lets the caller show "Importing 2 of 4: pack_002.zip" rather than
+ *        leaving the user staring at a frozen UI for tens of seconds.
+ */
+export async function pickAndImportPacks(onProgress) {
   const files = await pickZipFiles();
   const result = { imported: [], skipped: [], errors: [] };
-  for (const file of files) {
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i];
+    if (onProgress) {
+      onProgress({ index: i, total: files.length, file: file.name, phase: 'start' });
+    }
     try {
       // Pass a confirmFn that always declines so importPackZip silently
       // skips duplicates in batch mode rather than waiting for a modal.

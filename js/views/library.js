@@ -110,23 +110,38 @@ function hasNewSinceExport(pack, verdictsMap) {
 }
 
 async function onImport() {
+  /** @type {{update:(t:string)=>void, done:(t:string,k?:string,ms?:number)=>void, dismiss:()=>void}|null} */
+  let progress = null;
   try {
-    const r = await pickAndImportPacks();
+    const r = await pickAndImportPacks(({ index, total, file }) => {
+      if (!progress && total > 0) {
+        progress = window.showProgress(
+          `Importing 1 of ${total}: ${file}`
+        );
+      } else if (progress) {
+        progress.update(`Importing ${index + 1} of ${total}: ${file}`);
+      }
+    });
     const total = r.imported.length + r.skipped.length + r.errors.length;
-    if (total === 0) return;  // user cancelled the picker
+    if (total === 0) {
+      progress?.dismiss();
+      return;  // user cancelled the picker
+    }
     const parts = [];
     if (r.imported.length) parts.push(`✓ Imported ${r.imported.length}`);
     if (r.skipped.length) parts.push(`${r.skipped.length} already in library`);
     if (r.errors.length) parts.push(`${r.errors.length} failed`);
-    window.showToast(
-      parts.join(' · '),
-      r.errors.length ? 'err' : 'ok',
-      r.errors.length ? 6000 : 3500,
-    );
+    const msg = parts.join(' · ');
+    const kind = r.errors.length ? 'err' : 'ok';
+    const ms = r.errors.length ? 6000 : 3500;
+    if (progress) progress.done(msg, kind, ms);
+    else window.showToast(msg, kind, ms);
     await refresh();
   } catch (e) {
     console.error(e);
-    window.showToast(`Import failed: ${e.message}`, 'err', 4000);
+    const msg = `Import failed: ${e.message}`;
+    if (progress) progress.done(msg, 'err', 4000);
+    else window.showToast(msg, 'err', 4000);
   }
 }
 

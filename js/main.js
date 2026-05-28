@@ -48,6 +48,28 @@ window.showToast = function showToast(message, kind = 'ok', ms = 2200) {
   setTimeout(() => t.remove(), ms);
 };
 
+/**
+ * Persistent progress toast — returns handles so the caller can update
+ * the text as work proceeds, then dismiss with a final status. Used by
+ * the multi-select pack import so the user sees "Importing 2 of 4…"
+ * rather than a frozen UI for ~30 seconds.
+ */
+window.showProgress = function showProgress(initialText) {
+  const t = document.createElement('div');
+  t.className = 'toast progress';
+  t.textContent = initialText;
+  document.body.appendChild(t);
+  return {
+    update(text) { t.textContent = text; },
+    done(text, kind = 'ok', ms = 2800) {
+      t.className = `toast ${kind}`;
+      t.textContent = text;
+      setTimeout(() => t.remove(), ms);
+    },
+    dismiss() { t.remove(); },
+  };
+};
+
 window.addEventListener('hashchange', route);
 
 (async () => {
