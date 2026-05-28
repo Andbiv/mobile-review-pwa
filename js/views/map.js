@@ -203,8 +203,12 @@ async function renderMapWithOrtho() {
   }
 
   // --- COG base layer ---
+  // interpolate: false so we review actual pixels, not OL's resampled
+  // smoothing. The card-review use case is "real tree or shadow?", which
+  // is exactly the question interpolation makes harder.
   const source = new ol.source.GeoTIFF({
     sources: [{ blob: cogBlob }],
+    interpolate: false,
     // convertToRGB: true,  // uncomment if multi-band COG renders wrong
   });
   const baseLayer = new ol.layer.WebGLTile({ source });
