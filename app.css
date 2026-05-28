@@ -52,6 +52,16 @@ main#app { display: block; min-height: 100vh; }
 .app-header .nav-btn {
   padding: 0.4em 0.7em; font-size: 1.1em; min-height: 40px; min-width: 40px;
 }
+.version-chip {
+  background: var(--surface-hi);
+  color: var(--text-muted);
+  padding: 0.25em 0.55em;
+  border-radius: 0.4em;
+  font-size: 0.7em;
+  font-family: ui-monospace, SF Mono, Menlo, Consolas, monospace;
+  white-space: nowrap;
+  align-self: center;
+}
 
 /* ---------------------------------------------------------------- buttons */
 button {

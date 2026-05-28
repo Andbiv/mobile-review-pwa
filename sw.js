@@ -9,14 +9,16 @@
 
 // Bump the version string on every UI change so the SW evicts the old cache
 // on activate and forces fresh fetches of HTML/JS/CSS. iOS Safari is sticky
-// about cached shells otherwise.
-const SHELL_CACHE = 'juniper-review-shell-v2';
+// about cached shells otherwise. (And the BUILD constant in js/build.js
+// shows the version in the PWA header so you can verify which is live.)
+const SHELL_CACHE = 'juniper-review-shell-v3';
 const SHELL = [
   './',
   './index.html',
   './app.css',
   './manifest.webmanifest',
   './js/main.js',
+  './js/build.js',
   './js/state.js',
   './js/pack-import.js',
   './js/verdict-export.js',

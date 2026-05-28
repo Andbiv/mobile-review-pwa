@@ -12,6 +12,7 @@
 // Resume: re-opening a pack puts the cursor on the first detection without
 // a verdict in IDB. Undo rolls back one decision.
 
+import { BUILD } from '../build.js';
 import {
   getCrop, getPack, loadVerdictsForPack, putVerdict, deleteVerdict,
 } from '../state.js';
@@ -60,6 +61,7 @@ export async function renderReview(container, package_id) {
     <header class="app-header">
       <div class="title" id="hud-title">…</div>
       <div class="actions">
+        <span class="version-chip" title="PWA build identifier">${escapeHtml(BUILD)}</span>
         <button class="subtle nav-btn" id="prev-btn" aria-label="Previous">◀</button>
         <button class="subtle nav-btn" id="next-btn" aria-label="Next">▶</button>
         <button class="subtle" id="undo-btn" disabled>Undo</button>

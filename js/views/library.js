@@ -1,5 +1,6 @@
 // Library view — list of imported packs.
 
+import { BUILD } from '../build.js';
 import { deletePack, listPacks, loadVerdictsForPack } from '../state.js';
 import { pickAndImportPack } from '../pack-import.js';
 import { exportPackVerdicts } from '../verdict-export.js';
@@ -13,6 +14,7 @@ export async function renderLibrary(container) {
     <header class="app-header">
       <div class="title">Juniper Review</div>
       <div class="actions">
+        <span class="version-chip" title="PWA build identifier">${escapeHtml(BUILD)}</span>
         <button class="primary" id="import-btn">+ Import pack</button>
       </div>
     </header>
