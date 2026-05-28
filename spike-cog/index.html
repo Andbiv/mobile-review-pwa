@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>OPFS + COG Spike</title>
+<link rel="manifest" href="./manifest.webmanifest">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="OPFS Spike">
+
+<!-- OpenLayers v10+ has built-in COG-from-Blob support via ol/source/GeoTIFF -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ol@10.5.0/ol.css">
+
+<style>
+  :root { --ok:#2e7d32; --bad:#c62828; --blue:#1565c0; --gray:#616161; --bg:#f5f5f5; }
+  body { font:16px/1.45 -apple-system,BlinkMacSystemFont,system-ui,sans-serif;
+         max-width:48em; margin:0 auto; padding:env(safe-area-inset-top) 1em env(safe-area-inset-bottom);
+         color:#222; }
+  h1 { font-size:1.3em; margin:.6em 0 .3em; }
+  h2 { font-size:1em; margin:1.4em 0 .4em; color:var(--blue); }
+  .chips { display:flex; flex-wrap:wrap; gap:.4em; margin:.6em 0; }
+  .chip { padding:.25em .55em; border-radius:.4em; font-size:.78em;
+          background:var(--bg); color:var(--gray); font-family:ui-monospace,monospace; }
+  .chip.ok { background:#e8f5e9; color:var(--ok); }
+  .chip.bad { background:#ffebee; color:var(--bad); }
+  button { appearance:none; background:var(--blue); color:#fff; border:0;
+           border-radius:.5em; padding:1em 1.2em; font-size:1em; font-weight:600;
+           cursor:pointer; min-height:48px; margin:.3em 0; width:100%; }
+  button.alt { background:#37474f; }
+  button.danger { background:var(--bad); }
+  button:disabled { background:#cfd8dc; color:#90a4ae; }
+  .test { background:var(--bg); border-radius:.6em; padding:1em; margin:1em 0; }
+  .result { font-family:ui-monospace,monospace; font-size:.82em;
+            background:#fff; border:1px solid #ddd; padding:.6em;
+            border-radius:.4em; margin-top:.6em; white-space:pre-wrap;
+            max-height:24em; overflow:auto; }
+  progress { width:100%; height:1.2em; margin-top:.6em; }
+  .pass { color:var(--ok); font-weight:700; }
+  .fail { color:var(--bad); font-weight:700; }
+  #map { width:100%; height:60vw; max-height:480px; background:#222;
+         border-radius:.5em; margin-top:.6em; }
+</style>
+</head>
+<body>
+
+<h1>OPFS + COG render spike</h1>
+<p style="color:var(--gray); font-size:.9em">
+  Validates that an iPad PWA can (a) stream-copy a multi-100MB COG into
+  Origin Private File System, (b) re-open it from OPFS after a cold reload,
+  (c) render tiles via OpenLayers' GeoTIFF source. If all three pass, the
+  full "iPad map review" build is unblocked.
+</p>
+
+<h2>1. Environment</h2>
+<div class="chips" id="env-chips"></div>
+<div id="storage-info" class="result">checking…</div>
+
+<h2>2. Stream-copy a COG into OPFS</h2>
+<div class="test">
+  <p>Pick the test COG you placed in your OneDrive folder. PWA streams it
+     into OPFS in 8 MB chunks. After this succeeds, the file is persisted
+     and you can reload the page — Test 3 will read it back.</p>
+  <input type="file" id="cog-input" accept=".tif,.tiff,image/tiff" style="display:none">
+  <button onclick="document.getElementById('cog-input').click()">Pick a COG to copy into OPFS</button>
+  <progress id="copy-progress" max="1" value="0" style="display:none"></progress>
+  <div class="result" id="r-copy">Waiting…</div>
+</div>
+
+<h2>3. Read from OPFS + render with OpenLayers</h2>
+<div class="test">
+  <p>Opens the OPFS-stored COG, hands it to OpenLayers as a Blob source,
+     and renders into the canvas below. The map should be pannable +
+     pinch-zoomable.</p>
+  <button onclick="renderFromOpfs()">Render OPFS COG with OpenLayers</button>
+  <div id="map"></div>
+  <div class="result" id="r-render">Waiting…</div>
+</div>
+
+<h2>4. Cold-restart persistence check</h2>
+<div class="test">
+  <p>Force-close this page (swipe up off the app switcher) and reopen it.
+     If OPFS persistence is working, Test 1's storage info above should
+     show the COG is still there, and Test 3 will render without you
+     re-picking the file.</p>
+</div>
+
+<h2>5. Storage cleanup</h2>
+<div class="test">
+  <button class="danger" onclick="clearOpfs()">Delete OPFS contents</button>
+  <div class="result" id="r-clear">Use when you want to wipe the spike's OPFS data.</div>
+</div>
+
+<!-- OpenLayers UMD build for direct browser use -->
+<script src="https://cdn.jsdelivr.net/npm/ol@10.5.0/dist/ol.js"></script>
+<script>
+// ---------- env detection ----------
+function envCheck() {
+  const env = document.getElementById('env-chips');
+  const chips = [];
+  const standalone = window.matchMedia('(display-mode: standalone)').matches
+                  || window.navigator.standalone === true;
+  chips.push(standalone
+    ? '<span class="chip ok">PWA standalone</span>'
+    : '<span class="chip">Safari (not installed PWA)</span>');
+  chips.push(navigator.storage && navigator.storage.getDirectory
+    ? '<span class="chip ok">OPFS available</span>'
+    : '<span class="chip bad">OPFS missing</span>');
+  chips.push(typeof ol !== 'undefined' && ol.source && ol.source.GeoTIFF
+    ? '<span class="chip ok">OpenLayers GeoTIFF</span>'
+    : '<span class="chip bad">OL not loaded</span>');
+  env.innerHTML = chips.join('');
+}
+
+async function storageInfo() {
+  const el = document.getElementById('storage-info');
+  try {
+    const root = await navigator.storage.getDirectory();
+    const items = [];
+    for await (const [name, handle] of root) {
+      if (handle.kind === 'file') {
+        const f = await handle.getFile();
+        items.push(`  ${name}: ${(f.size/1e6).toFixed(1)} MB, modified ${new Date(f.lastModified).toISOString()}`);
+      } else {
+        items.push(`  ${name}/  (directory)`);
+      }
+    }
+    const est = await navigator.storage.estimate();
+    const usagePct = est.quota ? ((est.usage/est.quota)*100).toFixed(2) : '?';
+    const persistGranted = await navigator.storage.persisted();
+    let txt = `OPFS root contents (${items.length} entries):\n`;
+    txt += items.length ? items.join('\n') : '  (empty)';
+    txt += `\n\nstorage.estimate: ${(est.usage/1e6).toFixed(1)} MB used of `
+        + `${est.quota ? (est.quota/1e9).toFixed(1)+' GB' : '?'} quota (${usagePct}%)`;
+    txt += `\nstorage.persisted(): ${persistGranted}`;
+    el.textContent = txt;
+  } catch (e) {
+    el.innerHTML = `<span class="fail">storage error: ${e.message}</span>`;
+  }
+}
+
+// ---------- 2. stream-copy ----------
+document.getElementById('cog-input').addEventListener('change', async ev => {
+  const file = ev.target.files[0];
+  if (!file) return;
+  const res = document.getElementById('r-copy');
+  const prog = document.getElementById('copy-progress');
+  prog.style.display = 'block';
+  prog.value = 0;
+  const t0 = performance.now();
+  res.textContent = `Source: ${file.name}\nSize: ${(file.size/1e6).toFixed(1)} MB\nStreaming to OPFS in 8MB chunks…`;
+  try {
+    if (navigator.storage && navigator.storage.persist) {
+      const ok = await navigator.storage.persist();
+      console.log('persist() granted:', ok);
+    }
+    const root = await navigator.storage.getDirectory();
+    try { await root.removeEntry('cog.tif'); } catch (e) { /* didn't exist */ }
+    const fh = await root.getFileHandle('cog.tif', { create: true });
+    const writable = await fh.createWritable();
+    const chunkSize = 8 * 1024 * 1024;
+    let written = 0;
+    while (written < file.size) {
+      const end = Math.min(written + chunkSize, file.size);
+      const chunk = file.slice(written, end);
+      await writable.write(chunk);
+      written = end;
+      prog.value = written / file.size;
+    }
+    await writable.close();
+    const dt = ((performance.now() - t0)/1000).toFixed(1);
+    res.innerHTML = `<span class="pass">✓ PASS</span>\nWrote ${(file.size/1e6).toFixed(1)} MB to OPFS in ${dt}s.`
+                  + `\nAvg throughput: ${(file.size/1e6/dt).toFixed(1)} MB/s.`;
+    await storageInfo();
+  } catch (e) {
+    res.innerHTML = `<span class="fail">✗ FAIL</span>\n${e.message}\n${e.stack || ''}`;
+  }
+});
+
+// ---------- 3. render ----------
+let _map = null;
+async function renderFromOpfs() {
+  const res = document.getElementById('r-render');
+  res.textContent = 'Opening OPFS file…';
+  try {
+    const root = await navigator.storage.getDirectory();
+    const fh = await root.getFileHandle('cog.tif');
+    const file = await fh.getFile();
+    res.textContent = `Got Blob from OPFS: ${(file.size/1e6).toFixed(1)} MB\nLoading GeoTIFF source…`;
+
+    if (_map) { _map.setTarget(null); _map = null; }
+    const source = new ol.source.GeoTIFF({
+      sources: [{ blob: file }],
+    });
+
+    _map = new ol.Map({
+      target: 'map',
+      layers: [new ol.layer.WebGLTile({ source })],
+      view: source.getView(),
+    });
+
+    // GeoTIFF source loads asynchronously; ready-ness is signaled by view promise.
+    const view = await source.getView();
+    res.innerHTML = `<span class="pass">✓ PASS</span>\nRendered with OpenLayers WebGLTile + GeoTIFF source from Blob.`
+                  + `\nProjection: ${view.projection.getCode()}`
+                  + `\nExtent: ${view.extent.map(x=>x.toFixed(2)).join(', ')}`
+                  + `\nResolutions: ${view.resolutions ? view.resolutions.length + ' levels' : 'n/a'}`;
+  } catch (e) {
+    res.innerHTML = `<span class="fail">✗ FAIL</span>\n${e.message}\n${e.stack || ''}`;
+    console.error(e);
+  }
+}
+
+// ---------- 5. cleanup ----------
+async function clearOpfs() {
+  const res = document.getElementById('r-clear');
+  try {
+    const root = await navigator.storage.getDirectory();
+    const names = [];
+    for await (const [name] of root) names.push(name);
+    for (const name of names) await root.removeEntry(name, { recursive: true });
+    res.innerHTML = `<span class="pass">OPFS cleared (${names.length} entries removed)</span>`;
+    if (_map) { _map.setTarget(null); _map = null; }
+    document.getElementById('map').innerHTML = '';
+    await storageInfo();
+  } catch (e) {
+    res.innerHTML = `<span class="fail">${e.message}</span>`;
+  }
+}
+
+// ---------- bootstrap ----------
+envCheck();
+storageInfo();
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./sw.js').catch(e => console.warn('SW register failed', e));
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,10 @@
+{
+  "name": "OPFS COG Spike",
+  "short_name": "OPFS Spike",
+  "description": "Validation spike for OPFS + COG rendering on iPad PWA",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#1565c0"
+}
